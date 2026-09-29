@@ -22,45 +22,29 @@ public class UserController {
     }
 
     @PostMapping("/add")
-    public ResponseEntity<?> createUser(@Valid @RequestBody User user, Errors errors) {
-        if (errors.hasErrors()) return ResponseEntity.status(400).body(new ApiResponse(errors.getFieldError().getDefaultMessage()));
+    public ResponseEntity<?> createUser(@Valid @RequestBody User user) {
+        userService.createUser(user);
 
-        int createCase = userService.createUser(user);
-
-        return switch (createCase) {
-            case 1 -> ResponseEntity.status(400).body(new ApiResponse("Email already exists"));
-            default -> ResponseEntity.status(201).body(new ApiResponse("Created new user successfully"));
-        };
+        return ResponseEntity.status(201).body(new ApiResponse("Created new user successfully"));
     }
 
     @PutMapping("/update/{id}")
-    public ResponseEntity<?> updateUser(@PathVariable Integer id, @Valid @RequestBody User user, Errors errors) {
-        if (errors.hasErrors()) return ResponseEntity.status(400).body(new ApiResponse(errors.getFieldError().getDefaultMessage()));
+    public ResponseEntity<?> updateUser(@PathVariable Integer id, @Valid @RequestBody User user) {
+        userService.updateUser(id, user);
 
-        int updateCase = userService.updateUser(id, user);
-
-        return switch (updateCase) {
-            case 1 -> ResponseEntity.status(400).body(new ApiResponse("User not found"));
-            case 2 -> ResponseEntity.status(400).body(new ApiResponse("Email already exists"));
-            default -> ResponseEntity.status(200).body(new ApiResponse("Updated user successfully"));
-        };
+        return ResponseEntity.status(200).body(new ApiResponse("Updated user successfully"));
     }
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable Integer id) {
-        int deleteCase = userService.deleteUser(id);
+        userService.deleteUser(id);
 
-        return switch (deleteCase) {
-            case 1 -> ResponseEntity.status(400).body(new ApiResponse("User not found"));
-            default -> ResponseEntity.status(200).body(new ApiResponse("Deleted user successfully"));
-        };
+        return ResponseEntity.status(200).body(new ApiResponse("Deleted user successfully"));
     }
 
     @GetMapping("/get/{id}")
     public ResponseEntity<?> getUser(@PathVariable Integer id) {
         User user = userService.getUser(id);
-
-        if (user == null) return ResponseEntity.status(400).body(new ApiResponse("User not found"));
 
         return ResponseEntity.status(200).body(user);
     }

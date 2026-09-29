@@ -1,5 +1,6 @@
 package com.nawaf.meetingpoint.Service;
 
+import com.nawaf.meetingpoint.Api.ApiException;
 import com.nawaf.meetingpoint.Model.MeetingRequest;
 import com.nawaf.meetingpoint.Repository.MeetingRequestRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,67 +17,61 @@ public class InviteCodeService {
     // 0 = Invite code generated successfully
     // 1 = Meeting request not found
     // 2 = User is not the organizer
-    // 3 = Meeting request is cancelled
+    // 3 = Meeting request is canceled
     // 4 = Meeting request already started
     // 5 = Invite code already exists
-    public int generateInviteCode(Integer requestId, Integer organizerId) {
+    public void generateInviteCode(Integer requestId, Integer organizerId) {
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(requestId);
 
-        if (meetingRequest == null) return 1;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 2;
-        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) return 3;
-        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) return 4;
-        if (meetingRequest.getInviteCode() != null) return 5;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("User is not the organizer");
+        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) throw new ApiException("Meeting request is canceled");
+        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) throw new ApiException("Meeting request already started");
+        if (meetingRequest.getInviteCode() != null) throw new ApiException("Invite code already exists");
 
         meetingRequest.setInviteCode(createUniqueCode());
 
         meetingRequestRepository.save(meetingRequest);
-
-        return 0;
     }
 
     // 0 = Invite code regenerated successfully
     // 1 = Meeting request not found
     // 2 = User is not the organizer
-    // 3 = Meeting request is cancelled
+    // 3 = Meeting request is canceled
     // 4 = Meeting request already started
     // 5 = Invite code is disabled
-    public int regenerateInviteCode(Integer requestId, Integer organizerId) {
+    public void regenerateInviteCode(Integer requestId, Integer organizerId) {
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(requestId);
 
-        if (meetingRequest == null) return 1;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 2;
-        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) return 3;
-        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) return 4;
-        if (meetingRequest.getInviteCode() == null) return 5;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("User is not the organizer");
+        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) throw new ApiException("Meeting request is canceled");
+        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) throw new ApiException("Meeting request already started");
+        if (meetingRequest.getInviteCode() == null) throw new ApiException("Invite code is disabled");
 
         meetingRequest.setInviteCode(createUniqueCode());
 
         meetingRequestRepository.save(meetingRequest);
-
-        return 0;
     }
 
     // 0 = Invite code disabled successfully
     // 1 = Meeting request not found
     // 2 = User is not the organizer
-    // 3 = Meeting request is cancelled
+    // 3 = Meeting request is canceled
     // 4 = Meeting request already started
     // 5 = Invite code is already disabled
-    public int disableInviteCode(Integer requestId, Integer organizerId) {
+    public void disableInviteCode(Integer requestId, Integer organizerId) {
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(requestId);
 
-        if (meetingRequest == null) return 1;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 2;
-        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) return 3;
-        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) return 4;
-        if (meetingRequest.getInviteCode() == null) return 5;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("User is not the organizer");
+        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) throw new ApiException("Meeting request is canceled");
+        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) throw new ApiException("Meeting request already started");
+        if (meetingRequest.getInviteCode() == null) throw new ApiException("Invite code is disabled");
 
         meetingRequest.setInviteCode(null);
 
         meetingRequestRepository.save(meetingRequest);
-
-        return 0;
     }
 
     public MeetingRequest getMeetingRequestByInviteCode(String inviteCode) {

@@ -1,5 +1,6 @@
 package com.nawaf.meetingpoint.Service;
 
+import com.nawaf.meetingpoint.Api.ApiException;
 import com.nawaf.meetingpoint.Model.Meeting;
 import com.nawaf.meetingpoint.Model.Participant;
 import com.nawaf.meetingpoint.Model.Place;
@@ -34,26 +35,26 @@ public class VoteService {
     // 6 = Place not found
     // 7 = Place does not belong to this meeting
     // 8 = Participant already voted
-    public int vote(Integer meetingId, Integer participantId, Integer userId, Integer placeId) {
+    public void vote(Integer meetingId, Integer participantId, Integer userId, Integer placeId) {
         Meeting meeting = meetingRepository.findMeetingById(meetingId);
 
-        if (meeting == null) return 1;
-        if (!meeting.getStatus().equalsIgnoreCase("VOTING")) return 2;
+        if (meeting == null) throw new ApiException("Meeting not found");
+        if (!meeting.getStatus().equalsIgnoreCase("VOTING")) throw new ApiException("Meeting is not in voting status");
 
         Participant participant = participantRepository.findParticipantById(participantId);
 
-        if (participant == null) return 3;
-        if (!participant.getMeetingId().equals(meetingId)) return 4;
-        if (!participant.getUserId().equals(userId)) return 5;
+        if (participant == null) throw new ApiException("Participant not found");
+        if (!participant.getMeetingId().equals(meetingId)) throw new ApiException("Participant does not belong to this meeting");
+        if (!participant.getUserId().equals(userId)) throw new ApiException("User does not own this participant");
 
         Place place = placeRepository.findPlaceById(placeId);
 
-        if (place == null) return 6;
-        if (!place.getMeetingId().equals(meetingId)) return 7;
+        if (place == null) throw new ApiException("Place not found");
+        if (!place.getMeetingId().equals(meetingId)) throw new ApiException("Place does not belong to this meeting");
 
         Vote oldVote = voteRepository.findVoteByParticipantId(participantId);
 
-        if (oldVote != null) return 8;
+        if (oldVote != null) throw new ApiException("Participant already voted");
 
         Vote vote = new Vote();
 
@@ -61,8 +62,6 @@ public class VoteService {
         vote.setPlaceId(placeId);
 
         voteRepository.save(vote);
-
-        return 0;
     }
 
     // 0 = Vote changed successfully
@@ -75,33 +74,31 @@ public class VoteService {
     // 7 = Place does not belong to this meeting
     // 8 = Vote not found
     // 9 = Participant already voted for this place
-    public int changeVote(Integer meetingId, Integer participantId, Integer userId, Integer placeId) {
+    public void changeVote(Integer meetingId, Integer participantId, Integer userId, Integer placeId) {
         Meeting meeting = meetingRepository.findMeetingById(meetingId);
 
-        if (meeting == null) return 1;
-        if (!meeting.getStatus().equalsIgnoreCase("VOTING")) return 2;
+        if (meeting == null) throw new ApiException("Meeting not found");
+        if (!meeting.getStatus().equalsIgnoreCase("VOTING")) throw new ApiException("Meeting is not in voting status");
 
         Participant participant = participantRepository.findParticipantById(participantId);
 
-        if (participant == null) return 3;
-        if (!participant.getMeetingId().equals(meetingId)) return 4;
-        if (!participant.getUserId().equals(userId)) return 5;
+        if (participant == null) throw new ApiException("Participant not found");
+        if (!participant.getMeetingId().equals(meetingId)) throw new ApiException("Participant does not belong to this meeting");
+        if (!participant.getUserId().equals(userId)) throw new ApiException("User does not own this participant");
 
         Place place = placeRepository.findPlaceById(placeId);
 
-        if (place == null) return 6;
-        if (!place.getMeetingId().equals(meetingId)) return 7;
+        if (place == null) throw new ApiException("Place not found");
+        if (!place.getMeetingId().equals(meetingId)) throw new ApiException("Place does not belong to this meeting");
 
         Vote vote = voteRepository.findVoteByParticipantId(participantId);
 
-        if (vote == null) return 8;
-        if (vote.getPlaceId().equals(placeId)) return 9;
+        if (vote == null) throw new ApiException("Vote not found");
+        if (vote.getPlaceId().equals(placeId)) throw new ApiException("Participant already voted for this place");
 
         vote.setPlaceId(placeId);
 
         voteRepository.save(vote);
-
-        return 0;
     }
 
     public List<Vote> getVotesForPlace(Integer placeId) {
@@ -111,7 +108,7 @@ public class VoteService {
     public Map<String, Object> getVotingResult(Integer meetingId) {
         Meeting meeting = meetingRepository.findMeetingById(meetingId);
 
-        if (meeting == null) return null;
+        if (meeting == null) throw new ApiException("Meeting not found");
 
         long totalParticipants = participantRepository.countParticipantsByMeetingId(meetingId);
 

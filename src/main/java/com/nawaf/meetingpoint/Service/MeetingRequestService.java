@@ -1,10 +1,13 @@
 package com.nawaf.meetingpoint.Service;
 
+import com.nawaf.meetingpoint.Api.ApiException;
+import com.nawaf.meetingpoint.Api.ApiResponse;
 import com.nawaf.meetingpoint.Model.MeetingRequest;
 import com.nawaf.meetingpoint.Model.User;
 import com.nawaf.meetingpoint.Repository.MeetingRequestRepository;
 import com.nawaf.meetingpoint.Repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,17 +25,16 @@ public class MeetingRequestService {
 
     // 0 = Meeting request created successfully
     // 1 = Organizer not found
-    public int createMeetingRequest(MeetingRequest meetingRequest) {
+    public void createMeetingRequest(MeetingRequest meetingRequest) {
         User organizer = userRepository.findUserById(meetingRequest.getOrganizerId());
 
-        if (organizer == null) return 1;
+        if (organizer == null) throw new ApiException("Organizer not found");
 
         meetingRequest.setCategory(meetingRequest.getCategory().toLowerCase());
         meetingRequest.setStatus("PENDING");
         meetingRequest.setInviteCode(null);
 
         meetingRequestRepository.save(meetingRequest);
-        return 0;
     }
 
     // 0 = Meeting request updated successfully
@@ -40,38 +42,40 @@ public class MeetingRequestService {
     // 2 = User is not the organizer
     // 3 = Meeting request already started
     // 4 = Meeting request is canceled
-    public int updateMeetingRequest(Integer id, Integer userId, MeetingRequest updatedMeetingRequest) {
+    public void updateMeetingRequest(Integer id, Integer userId, MeetingRequest updatedMeetingRequest) {
         MeetingRequest oldMeetingRequest = meetingRequestRepository.findMeetingRequestById(id);
 
-        if (oldMeetingRequest == null) return 1;
-        if (!oldMeetingRequest.getOrganizerId().equals(userId)) return 2;
-        if (oldMeetingRequest.getStatus().equalsIgnoreCase("READY")) return 3;
-        if (oldMeetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) return 4;
+        if (oldMeetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!oldMeetingRequest.getOrganizerId().equals(userId)) throw new ApiException("User is not the organizer");
+        if (oldMeetingRequest.getStatus().equalsIgnoreCase("READY")) throw new ApiException("Meeting request already started");
+        if (oldMeetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) throw new ApiException("Meeting request is canceled");
 
         oldMeetingRequest.setName(updatedMeetingRequest.getName());
         oldMeetingRequest.setCategory(updatedMeetingRequest.getCategory().toLowerCase());
         oldMeetingRequest.setMeetingTime(updatedMeetingRequest.getMeetingTime());
 
         meetingRequestRepository.save(oldMeetingRequest);
-        return 0;
     }
 
     // 0 = Meeting request deleted successfully
     // 1 = Meeting request not found
     // 2 = User is not the organizer
     // 3 = Meeting request already started
-    public int deleteMeetingRequest(Integer id, Integer userId) {
+    public void deleteMeetingRequest(Integer id, Integer userId) {
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(id);
 
-        if (meetingRequest == null) return 1;
-        if (!meetingRequest.getOrganizerId().equals(userId)) return 2;
-        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) return 3;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(userId)) throw new ApiException("User is not the organizer");
+        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) throw new ApiException("Meeting request already started");
 
         meetingRequestRepository.delete(meetingRequest);
-        return 0;
     }
 
     public MeetingRequest getMeetingRequest(Integer id) {
+        MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(id);
+
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+
         return meetingRequestRepository.findMeetingRequestById(id);
     }
 
@@ -80,17 +84,16 @@ public class MeetingRequestService {
     // 2 = User is not the organizer
     // 3 = Meeting request is already canceled
     // 4 = Meeting request already started
-    public int cancelMeetingRequest(Integer id, Integer userId) {
+    public void cancelMeetingRequest(Integer id, Integer userId) {
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(id);
 
-        if (meetingRequest == null) return 1;
-        if (!meetingRequest.getOrganizerId().equals(userId)) return 2;
-        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) return 3;
-        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) return 4;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(userId)) throw new ApiException("User is not the organizer");
+        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) throw new ApiException("Meeting request already canceled");
+        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) throw new ApiException("Meeting request already started");
 
         meetingRequest.setStatus("CANCELLED");
 
         meetingRequestRepository.save(meetingRequest);
-        return 0;
     }
 }

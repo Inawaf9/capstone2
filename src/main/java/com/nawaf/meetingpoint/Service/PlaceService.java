@@ -1,5 +1,6 @@
 package com.nawaf.meetingpoint.Service;
 
+import com.nawaf.meetingpoint.Api.ApiException;
 import com.nawaf.meetingpoint.DTO.Recommendation.SelectPlaceDTO;
 import com.nawaf.meetingpoint.Model.Meeting;
 import com.nawaf.meetingpoint.Model.MeetingRequest;
@@ -48,26 +49,24 @@ public class PlaceService {
     // 5 = Place does not belong to this meeting
     // 6 = Meeting request not found
     @Transactional
-    public int removePlace(Integer meetingId, Integer organizerId, Integer placeId) {
+    public void removePlace(Integer meetingId, Integer organizerId, Integer placeId) {
         Meeting meeting = meetingRepository.findMeetingById(meetingId);
 
-        if (meeting == null) return 1;
+        if (meeting == null) throw new ApiException("Meeting not found");
 
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(meeting.getMeetingRequestId());
 
-        if (meetingRequest == null) return 6;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 2;
-        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) return 3;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("User is not the organizer");
+        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) throw new ApiException("Meeting must be open");
 
         Place place = placeRepository.findPlaceById(placeId);
 
-        if (place == null) return 4;
-        if (!place.getMeetingId().equals(meetingId)) return 5;
+        if (place == null) throw new ApiException("Place not found");
+        if (!place.getMeetingId().equals(meetingId)) throw new ApiException("Place does not belong to this meeting");
 
         participantPlaceRouteRepository.deleteParticipantPlaceRoutesByPlaceId(placeId);
         placeRepository.delete(place);
-
-        return 0;
     }
 
     // 0 = Place added to voting successfully
@@ -80,37 +79,37 @@ public class PlaceService {
     // 7 = Invalid place data
     // 8 = Some participants have not provided their location
     @Transactional
-    public int selectPlaceForVoting(Integer meetingId, Integer participantId, Integer userId, SelectPlaceDTO placeDTO) {
+    public void selectPlaceForVoting(Integer meetingId, Integer participantId, Integer userId, SelectPlaceDTO placeDTO) {
         Meeting meeting = meetingRepository.findMeetingById(meetingId);
 
-        if (meeting == null) return 1;
-        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) return 2;
+        if (meeting == null) throw new ApiException("Meeting not found");
+        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) throw new ApiException("Meeting must be open");
 
         Participant participant = participantRepository.findParticipantById(participantId);
 
-        if (participant == null) return 3;
-        if (!participant.getMeetingId().equals(meetingId)) return 4;
-        if (!participant.getUserId().equals(userId)) return 5;
+        if (participant == null) throw new ApiException("Participant not found");
+        if (!participant.getMeetingId().equals(meetingId)) throw new ApiException("Participant does not belong to this meeting");
+        if (!participant.getUserId().equals(userId)) throw new ApiException("User does not own this participant");
 
-        if (placeDTO.googlePlaceId() == null || placeDTO.googlePlaceId().isBlank()) return 7;
-        if (placeDTO.name() == null || placeDTO.name().isBlank()) return 7;
-        if (placeDTO.address() == null || placeDTO.address().isBlank()) return 7;
-        if (placeDTO.latitude() == null || placeDTO.longitude() == null) return 7;
-        if (placeDTO.latitude() < -90 || placeDTO.latitude() > 90) return 7;
-        if (placeDTO.longitude() < -180 || placeDTO.longitude() > 180) return 7;
-        if (placeDTO.rating() != null && (placeDTO.rating() < 0 || placeDTO.rating() > 5)) return 7;
-        if (placeDTO.aiScore() != null && (placeDTO.aiScore() < 0 || placeDTO.aiScore() > 100)) return 7;
+        if (placeDTO.googlePlaceId() == null || placeDTO.googlePlaceId().isBlank()) throw new ApiException("Invalid place data");
+        if (placeDTO.name() == null || placeDTO.name().isBlank()) throw new ApiException("Invalid place data");
+        if (placeDTO.address() == null || placeDTO.address().isBlank()) throw new ApiException("Invalid place data");
+        if (placeDTO.latitude() == null || placeDTO.longitude() == null) throw new ApiException("Invalid place data");
+        if (placeDTO.latitude() < -90 || placeDTO.latitude() > 90) throw new ApiException("Invalid place data");
+        if (placeDTO.longitude() < -180 || placeDTO.longitude() > 180) throw new ApiException("Invalid place data");
+        if (placeDTO.rating() != null && (placeDTO.rating() < 0 || placeDTO.rating() > 5)) throw new ApiException("Invalid place data");
+        if (placeDTO.aiScore() != null && (placeDTO.aiScore() < 0 || placeDTO.aiScore() > 100)) throw new ApiException("Invalid place data");
 
         Place oldPlace = placeRepository.findPlaceByMeetingIdAndGooglePlaceId(meetingId, placeDTO.googlePlaceId());
 
-        if (oldPlace != null) return 6;
+        if (oldPlace != null) throw new ApiException("Place already selected for voting");
 
         List<Participant> participants = participantRepository.findParticipantsByMeetingId(meetingId);
 
-        if (participants.isEmpty()) return 8;
+        if (participants.isEmpty()) throw new ApiException("Some participants have not provided their location");
 
         for (Participant meetingParticipant : participants) {
-            if (meetingParticipant.getLatitude() == null || meetingParticipant.getLongitude() == null) return 8;
+            if (meetingParticipant.getLatitude() == null || meetingParticipant.getLongitude() == null) throw new ApiException("Some participants have not provided their location");
         }
 
         List<Double> distances = new ArrayList<>();
@@ -151,8 +150,6 @@ public class PlaceService {
 
             participantPlaceRouteRepository.save(route);
         }
-
-        return 0;
     }
 
     public String getGoogleMapsUrl(Integer placeId) {

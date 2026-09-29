@@ -33,34 +33,16 @@ public class PlaceController {
 
     @DeleteMapping("/remove/{meetingId}/{organizerId}/{placeId}")
     public ResponseEntity<?> removePlace(@PathVariable Integer meetingId, @PathVariable Integer organizerId, @PathVariable Integer placeId) {
-        int removeCase = placeService.removePlace(meetingId, organizerId, placeId);
+        placeService.removePlace(meetingId, organizerId, placeId);
 
-        return switch (removeCase) {
-            case 1 -> ResponseEntity.status(400).body(new ApiResponse("Meeting not found"));
-            case 2 -> ResponseEntity.status(400).body(new ApiResponse("Only the organizer can remove a place"));
-            case 3 -> ResponseEntity.status(400).body(new ApiResponse("Meeting must be OPEN"));
-            case 4 -> ResponseEntity.status(400).body(new ApiResponse("Place not found"));
-            case 5 -> ResponseEntity.status(400).body(new ApiResponse("Place does not belong to this meeting"));
-            case 6 -> ResponseEntity.status(400).body(new ApiResponse("Meeting request not found"));
-            default -> ResponseEntity.status(200).body(new ApiResponse("Place removed successfully"));
-        };
+        return ResponseEntity.status(200).body(new ApiResponse("Place removed successfully"));
     }
 
     @PostMapping("/meeting/{meetingId}/select/{participantId}/{userId}")
     public ResponseEntity<?> selectPlaceForVoting(@PathVariable Integer meetingId, @PathVariable Integer participantId, @PathVariable Integer userId, @RequestBody SelectPlaceDTO placeDTO) {
-        int selectCase = placeService.selectPlaceForVoting(meetingId, participantId, userId, placeDTO);
+        placeService.selectPlaceForVoting(meetingId, participantId, userId, placeDTO);
 
-        return switch (selectCase) {
-            case 1 -> ResponseEntity.status(400).body(new ApiResponse("Meeting not found"));
-            case 2 -> ResponseEntity.status(400).body(new ApiResponse("Meeting must be OPEN"));
-            case 3 -> ResponseEntity.status(400).body(new ApiResponse("Participant not found"));
-            case 4 -> ResponseEntity.status(400).body(new ApiResponse("Participant does not belong to this meeting"));
-            case 5 -> ResponseEntity.status(400).body(new ApiResponse("User does not own this participant"));
-            case 6 -> ResponseEntity.status(400).body(new ApiResponse("Place already selected for voting"));
-            case 7 -> ResponseEntity.status(400).body(new ApiResponse("Invalid place data"));
-            case 8 -> ResponseEntity.status(400).body(new ApiResponse("All participants must provide their location"));
-            default -> ResponseEntity.status(201).body(new ApiResponse("Place added to voting successfully"));
-        };
+        return ResponseEntity.status(201).body(new ApiResponse("Place added to voting successfully"));
     }
 
     @GetMapping("/google-maps/{placeId}")

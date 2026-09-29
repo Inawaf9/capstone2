@@ -1,5 +1,6 @@
 package com.nawaf.meetingpoint.Service;
 
+import com.nawaf.meetingpoint.Api.ApiException;
 import com.nawaf.meetingpoint.Client.GooglePlacesClient;
 import com.nawaf.meetingpoint.Client.OpenRouterClient;
 import com.nawaf.meetingpoint.DTO.GooglePlaces.GooglePlacesRequest;
@@ -62,20 +63,20 @@ public class MeetingService {
     // 4 = Meeting already started
     // 5 = No accepted members
     @Transactional
-    public int startMeeting(Integer requestId, Integer organizerId) {
+    public void startMeeting(Integer requestId, Integer organizerId) {
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(requestId);
 
-        if (meetingRequest == null) return 1;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 2;
-        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) return 3;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("Meeting request not found");
+        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) throw new ApiException("Meeting request is canceled");
 
         Meeting oldMeeting = meetingRepository.findMeetingByMeetingRequestId(requestId);
 
-        if (oldMeeting != null) return 4;
+        if (oldMeeting != null) throw new ApiException("Meeting request is canceled");
 
         List<MeetingRequestMember> acceptedMembers = meetingRequestMemberRepository.findMeetingRequestMembersByMeetingRequestIdAndStatus(requestId, "ACCEPTED");
 
-        if (acceptedMembers.isEmpty()) return 5;
+        if (acceptedMembers.isEmpty()) throw new ApiException("No accepted members");
 
         Meeting meeting = new Meeting();
 
@@ -105,8 +106,6 @@ public class MeetingService {
 
         meetingRequest.setStatus("READY");
         meetingRequestRepository.save(meetingRequest);
-
-        return 0;
     }
 
     // 0 = Meeting canceled successfully
@@ -115,22 +114,20 @@ public class MeetingService {
     // 3 = Meeting already canceled
     // 4 = Meeting already confirmed
     // 5 = Meeting request not found
-    public int cancelMeeting(Integer meetingId, Integer organizerId) {
+    public void cancelMeeting(Integer meetingId, Integer organizerId) {
         Meeting meeting = meetingRepository.findMeetingById(meetingId);
 
-        if (meeting == null) return 1;
+        if (meeting == null) throw new ApiException("Meeting not found");
 
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(meeting.getMeetingRequestId());
 
-        if (meetingRequest == null) return 5;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 2;
-        if (meeting.getStatus().equalsIgnoreCase("CANCELLED")) return 3;
-        if (meeting.getStatus().equalsIgnoreCase("CONFIRMED")) return 4;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("User is not the organizer");
+        if (meeting.getStatus().equalsIgnoreCase("CANCELLED")) throw new ApiException("Meeting already canceled");
+        if (meeting.getStatus().equalsIgnoreCase("CONFIRMED")) throw new ApiException("Meeting already confirmed");
 
         meeting.setStatus("CANCELLED");
         meetingRepository.save(meeting);
-
-        return 0;
     }
 
     public List<Participant> getMissingLocations(Integer meetingId) {
@@ -150,29 +147,27 @@ public class MeetingService {
     // 3 = Meeting must be open
     // 4 = Some participants have not provided their location
     // 5 = Meeting request not found
-    public int calculateCenter(Integer meetingId, Integer organizerId) {
+    public void calculateCenter(Integer meetingId, Integer organizerId) {
         Meeting meeting = meetingRepository.findMeetingById(meetingId);
 
-        if (meeting == null) return 1;
+        if (meeting == null) throw new ApiException("Meeting not found");
 
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(meeting.getMeetingRequestId());
 
-        if (meetingRequest == null) return 5;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 2;
-        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) return 3;
-        if (!isLocationReady(meetingId)) return 4;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("User is not the organizer");
+        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) throw new ApiException("Meeting must be open");
+        if (!isLocationReady(meetingId)) throw new ApiException("Some participants have not provided their location");
 
         Double averageLatitude = participantRepository.findAverageLatitudeByMeetingId(meetingId);
         Double averageLongitude = participantRepository.findAverageLongitudeByMeetingId(meetingId);
 
-        if (averageLatitude == null || averageLongitude == null) return 4;
+        if (averageLatitude == null || averageLongitude == null) throw new ApiException("Some participants have not provided their location");
 
         meeting.setCenterLatitude(averageLatitude);
         meeting.setCenterLongitude(averageLongitude);
 
         meetingRepository.save(meeting);
-
-        return 0;
     }
 
     public List<GooglePlacesResponse.PlaceResult> getNearbyPlaces(Integer meetingId) {
@@ -329,10 +324,20 @@ public class MeetingService {
     }
 
     public List<RecommendationDTO> generateRecommendations(Integer meetingId) {
+
+        Meeting meeting = getMeeting(meetingId);
+
+        if (meeting == null) throw new ApiException("Meeting not found");
+
+        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) throw new ApiException("Meeting must be OPEN");
+
+        if (!isLocationReady(meetingId)) throw new ApiException("All participants must provide their location");
+
+        if (meeting.getCenterLatitude() == null || meeting.getCenterLongitude() == null) throw new ApiException("Meeting center must be calculated first");
+
         List<RecommendationDTO> recommendations = calculatePlaceRecommendations(meetingId);
 
-        if (recommendations == null) return null;
-        if (recommendations.isEmpty()) return recommendations;
+        if (recommendations == null || recommendations.isEmpty()) throw new ApiException("No places found");
 
         return addAiRanking(recommendations);
     }
@@ -343,25 +348,23 @@ public class MeetingService {
     // 3 = Meeting must be open
     // 4 = At least two places are required
     // 5 = Meeting request not found
-    public int startVoting(Integer meetingId, Integer organizerId) {
+    public void startVoting(Integer meetingId, Integer organizerId) {
         Meeting meeting = meetingRepository.findMeetingById(meetingId);
 
-        if (meeting == null) return 1;
+        if (meeting == null) throw new ApiException("Meeting not found");
 
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(meeting.getMeetingRequestId());
 
-        if (meetingRequest == null) return 5;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 2;
-        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) return 3;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("User is not the organizer");
+        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) throw new ApiException("Meeting must be open");
 
         long placesCount = placeRepository.countPlacesByMeetingId(meetingId);
 
-        if (placesCount < 2) return 4;
+        if (placesCount < 2) throw new ApiException("At least two places are required");
 
         meeting.setStatus("VOTING");
         meetingRepository.save(meeting);
-
-        return 0;
     }
 
     // 0 = Meeting confirmed successfully
@@ -372,20 +375,20 @@ public class MeetingService {
     // 5 = Not all participants have voted
     // 6 = Meeting request not found
     @Transactional
-    public int confirmMeeting(Integer meetingId, Integer organizerId) {
+    public void confirmMeeting(Integer meetingId, Integer organizerId) {
         Meeting meeting = meetingRepository.findMeetingById(meetingId);
 
-        if (meeting == null) return 1;
+        if (meeting == null) throw new ApiException("Meeting not found");
 
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(meeting.getMeetingRequestId());
 
-        if (meetingRequest == null) return 6;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 2;
-        if (!meeting.getStatus().equalsIgnoreCase("VOTING")) return 3;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("User is not the organizer");
+        if (!meeting.getStatus().equalsIgnoreCase("VOTING")) throw new ApiException("Meeting must be in voting status");
 
         List<Place> places = placeRepository.findPlacesByMeetingId(meetingId);
 
-        if (places.isEmpty()) return 4;
+        if (places.isEmpty()) throw new ApiException("No places found");
 
         long totalParticipants = participantRepository.countParticipantsByMeetingId(meetingId);
         long totalVotes = 0;
@@ -394,7 +397,7 @@ public class MeetingService {
             totalVotes += voteRepository.countVotesByPlaceId(place.getId());
         }
 
-        if (totalParticipants == 0 || totalVotes < totalParticipants) return 5;
+        if (totalParticipants == 0 || totalVotes < totalParticipants) throw new ApiException("Not all participants have voted");
 
         Place winner = null;
         long highestVotes = -1;
@@ -432,7 +435,5 @@ public class MeetingService {
                 emailService.sendMeetingConfirmedEmail(user.getEmail(), user.getName(), meetingRequest.getName(), winner.getName(), googleMapsUrl);
             }
         }
-
-        return 0;
     }
 }

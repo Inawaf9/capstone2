@@ -1,5 +1,6 @@
 package com.nawaf.meetingpoint.Service;
 
+import com.nawaf.meetingpoint.Api.ApiException;
 import com.nawaf.meetingpoint.Model.MeetingRequest;
 import com.nawaf.meetingpoint.Model.MeetingRequestMember;
 import com.nawaf.meetingpoint.Model.User;
@@ -36,19 +37,19 @@ public class MeetingRequestMemberService {
     // 4 = Email is already invited
     // 5 = Meeting request already started
     @Transactional
-    public int inviteMember(Integer requestId, Integer organizerId, String email) {
+    public void inviteMember(Integer requestId, Integer organizerId, String email) {
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(requestId);
 
-        if (meetingRequest == null) return 1;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 2;
-        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) return 3;
-        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) return 5;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("User is not the organizer");
+        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) throw new ApiException("Meeting request is canceled");
+        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) throw new ApiException("Meeting request already started");
 
         email = email.trim().toLowerCase();
 
         MeetingRequestMember oldMember = meetingRequestMemberRepository.findMeetingRequestMemberByMeetingRequestIdAndEmail(requestId, email);
 
-        if (oldMember != null) return 4;
+        if (oldMember != null) throw new ApiException("Email is already invited");
 
         User user = userRepository.findUserByEmail(email);
 
@@ -71,8 +72,6 @@ public class MeetingRequestMemberService {
         String invitationUrl = "http://localhost:8080/invitation/" + member.getId();
 
         emailService.sendMeetingInvitation(email, organizerName, meetingRequest.getName(), meetingRequest.getMeetingTime().toString(), invitationUrl);
-
-        return 0;
     }
 
     // 0 = Invitation accepted successfully
@@ -84,30 +83,28 @@ public class MeetingRequestMemberService {
     // 6 = User is not registered with the invited email
     // 7 = Meeting request already started
     // 8 = Invitation does not belong to this user
-    public int acceptInvitation(Integer memberId, Integer userId) {
+    public void acceptInvitation(Integer memberId, Integer userId) {
         MeetingRequestMember member = meetingRequestMemberRepository.findMeetingRequestMemberById(memberId);
 
-        if (member == null) return 1;
+        if (member == null) throw new ApiException("Invitation not found");
 
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(member.getMeetingRequestId());
 
-        if (meetingRequest == null) return 2;
-        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) return 3;
-        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) return 7;
-        if (member.getStatus().equalsIgnoreCase("ACCEPTED")) return 4;
-        if (member.getStatus().equalsIgnoreCase("REJECTED")) return 5;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) throw new ApiException("Meeting request is canceled");
+        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) throw new ApiException("Meeting request already started");
+        if (member.getStatus().equalsIgnoreCase("ACCEPTED")) throw new ApiException("Invitation is already accepted");
+        if (member.getStatus().equalsIgnoreCase("REJECTED")) throw new ApiException("Invitation is already rejected");
 
         User user = userRepository.findUserById(userId);
 
-        if (user == null) return 6;
-        if (!user.getEmail().equalsIgnoreCase(member.getEmail())) return 8;
+        if (user == null) throw new ApiException("User is not registered with the invited email");
+        if (!user.getEmail().equalsIgnoreCase(member.getEmail())) throw new ApiException("Invitation does not belong to this user");
 
         member.setUserId(user.getId());
         member.setStatus("ACCEPTED");
 
         meetingRequestMemberRepository.save(member);
-
-        return 0;
     }
 
     // 0 = Invitation rejected successfully
@@ -118,29 +115,27 @@ public class MeetingRequestMemberService {
     // 5 = Invitation is already accepted
     // 6 = Meeting request already started
     // 7 = Invitation does not belong to this user
-    public int rejectInvitation(Integer memberId, Integer userId) {
+    public void rejectInvitation(Integer memberId, Integer userId) {
         MeetingRequestMember member = meetingRequestMemberRepository.findMeetingRequestMemberById(memberId);
 
-        if (member == null) return 1;
+        if (member == null) throw new ApiException("Invitation not found");
 
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(member.getMeetingRequestId());
 
-        if (meetingRequest == null) return 2;
-        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) return 3;
-        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) return 6;
-        if (member.getStatus().equalsIgnoreCase("REJECTED")) return 4;
-        if (member.getStatus().equalsIgnoreCase("ACCEPTED")) return 5;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) throw new ApiException("Meeting request is canceled");
+        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) throw new ApiException("Meeting request already started");
+        if (member.getStatus().equalsIgnoreCase("REJECTED")) throw new ApiException("Invitation is already accepted");
+        if (member.getStatus().equalsIgnoreCase("ACCEPTED")) throw new ApiException("Invitation is already rejected");
 
         User user = userRepository.findUserById(userId);
 
-        if (user == null || !user.getEmail().equalsIgnoreCase(member.getEmail())) return 7;
+        if (user == null || !user.getEmail().equalsIgnoreCase(member.getEmail())) throw new ApiException("User is not registered with the invited email");
 
         member.setUserId(user.getId());
         member.setStatus("REJECTED");
 
         meetingRequestMemberRepository.save(member);
-
-        return 0;
     }
 
     // 0 = Joined meeting request successfully
@@ -149,16 +144,16 @@ public class MeetingRequestMemberService {
     // 3 = User not found
     // 4 = User is already a member
     // 5 = Meeting request already started
-    public int joinByInviteCode(String inviteCode, Integer userId) {
+    public void joinByInviteCode(String inviteCode, Integer userId) {
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestByInviteCode(inviteCode);
 
-        if (meetingRequest == null) return 1;
-        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) return 2;
-        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) return 5;
+        if (meetingRequest == null) throw new ApiException("Invalid invite code");
+        if (meetingRequest.getStatus().equalsIgnoreCase("CANCELLED")) throw new ApiException("Meeting request is canceled");
+        if (meetingRequest.getStatus().equalsIgnoreCase("READY")) throw new ApiException("Meeting request already started");
 
         User user = userRepository.findUserById(userId);
 
-        if (user == null) return 3;
+        if (user == null) throw new ApiException("User not found");
 
         MeetingRequestMember member = meetingRequestMemberRepository.findMeetingRequestMemberByMeetingRequestIdAndEmail(meetingRequest.getId(), user.getEmail());
 
@@ -167,10 +162,9 @@ public class MeetingRequestMemberService {
                 member.setUserId(userId);
                 member.setStatus("ACCEPTED");
                 meetingRequestMemberRepository.save(member);
-                return 0;
             }
 
-            return 4;
+            throw new ApiException("User is already a member");
         }
 
         MeetingRequestMember newMember = new MeetingRequestMember();
@@ -181,8 +175,6 @@ public class MeetingRequestMemberService {
         newMember.setStatus("ACCEPTED");
 
         meetingRequestMemberRepository.save(newMember);
-
-        return 0;
     }
 
     public List<MeetingRequestMember> getAcceptedMembers(Integer requestId) {

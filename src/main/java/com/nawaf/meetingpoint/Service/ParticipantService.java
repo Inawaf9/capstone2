@@ -1,5 +1,6 @@
 package com.nawaf.meetingpoint.Service;
 
+import com.nawaf.meetingpoint.Api.ApiException;
 import com.nawaf.meetingpoint.Model.Meeting;
 import com.nawaf.meetingpoint.Model.MeetingRequest;
 import com.nawaf.meetingpoint.Model.MeetingRequestMember;
@@ -37,29 +38,29 @@ public class ParticipantService {
     // 5 = User is already a participant
     // 6 = User was not accepted to the meeting request
     // 7 = Meeting request not found
-    public int createParticipant(Integer meetingId, Integer organizerId, Integer userId) {
+    public void createParticipant(Integer meetingId, Integer organizerId, Integer userId) {
         Meeting meeting = meetingRepository.findMeetingById(meetingId);
 
-        if (meeting == null) return 1;
-        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) return 2;
+        if (meeting == null) throw new ApiException("Meeting not found");
+        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) throw new ApiException("Meeting is not open");
 
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(meeting.getMeetingRequestId());
 
-        if (meetingRequest == null) return 7;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 3;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("User is not the organizer");
 
         User user = userRepository.findUserById(userId);
 
-        if (user == null) return 4;
+        if (user == null) throw new ApiException("User to add not found");
 
         Participant oldParticipant = participantRepository.findParticipantByMeetingIdAndUserId(meetingId, userId);
 
-        if (oldParticipant != null) return 5;
+        if (oldParticipant != null) throw new ApiException("User is already a participant");
 
         if (!meetingRequest.getOrganizerId().equals(userId)) {
             MeetingRequestMember member = meetingRequestMemberRepository.findMeetingRequestMemberByMeetingRequestIdAndUserId(meetingRequest.getId(), userId);
 
-            if (member == null || !member.getStatus().equalsIgnoreCase("ACCEPTED")) return 6;
+            if (member == null || !member.getStatus().equalsIgnoreCase("ACCEPTED")) throw new ApiException("User was not accepted to the meeting request");
         }
 
         Participant participant = new Participant();
@@ -68,8 +69,6 @@ public class ParticipantService {
         participant.setUserId(userId);
 
         participantRepository.save(participant);
-
-        return 0;
     }
 
     // 0 = Participant removed successfully
@@ -80,30 +79,33 @@ public class ParticipantService {
     // 5 = Participant does not belong to this meeting
     // 6 = Organizer cannot be removed from the meeting
     // 7 = Meeting request not found
-    public int removeParticipant(Integer meetingId, Integer organizerId, Integer participantId) {
+    public void removeParticipant(Integer meetingId, Integer organizerId, Integer participantId) {
         Meeting meeting = meetingRepository.findMeetingById(meetingId);
 
-        if (meeting == null) return 1;
-        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) return 2;
+        if (meeting == null) throw new ApiException("Meeting not found");
+        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) throw new ApiException("Meeting is not open");
 
         MeetingRequest meetingRequest = meetingRequestRepository.findMeetingRequestById(meeting.getMeetingRequestId());
 
-        if (meetingRequest == null) return 7;
-        if (!meetingRequest.getOrganizerId().equals(organizerId)) return 3;
+        if (meetingRequest == null) throw new ApiException("Meeting request not found");
+        if (!meetingRequest.getOrganizerId().equals(organizerId)) throw new ApiException("User is not the organizer");
 
         Participant participant = participantRepository.findParticipantById(participantId);
 
-        if (participant == null) return 4;
-        if (!participant.getMeetingId().equals(meetingId)) return 5;
-        if (participant.getUserId().equals(meetingRequest.getOrganizerId())) return 6;
+        if (participant == null) throw new ApiException("User to add not found");
+        if (!participant.getMeetingId().equals(meetingId)) throw new ApiException("User is already a participant");
+        if (participant.getUserId().equals(meetingRequest.getOrganizerId())) throw new ApiException("User was not accepted to the meeting request");
 
         participantRepository.delete(participant);
 
-        return 0;
     }
 
     public Participant getParticipant(Integer id) {
-        return participantRepository.findParticipantById(id);
+        Participant participant = participantRepository.findParticipantById(id);
+
+        if (participant == null) throw new ApiException("Participant not found");
+
+        return participant;
     }
 
     // 0 = Location updated successfully
@@ -113,24 +115,22 @@ public class ParticipantService {
     // 4 = Invalid longitude
     // 5 = Meeting not found
     // 6 = Meeting does not allow location updates
-    public int updateLocation(Integer participantId, Integer userId, Double latitude, Double longitude) {
+    public void updateLocation(Integer participantId, Integer userId, Double latitude, Double longitude) {
         Participant participant = participantRepository.findParticipantById(participantId);
 
-        if (participant == null) return 1;
-        if (!participant.getUserId().equals(userId)) return 2;
-        if (latitude < -90 || latitude > 90) return 3;
-        if (longitude < -180 || longitude > 180) return 4;
+        if (participant == null) throw new ApiException("Participant not found");
+        if (!participant.getUserId().equals(userId)) throw new ApiException("User does not own this participant");
+        if (latitude < -90 || latitude > 90) throw new ApiException("Invalid latitude");
+        if (longitude < -180 || longitude > 180) throw new ApiException("Invalid longitude");
 
         Meeting meeting = meetingRepository.findMeetingById(participant.getMeetingId());
 
-        if (meeting == null) return 5;
-        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) return 6;
+        if (meeting == null) throw new ApiException("Meeting not found");
+        if (!meeting.getStatus().equalsIgnoreCase("OPEN")) throw new ApiException("Meeting does not allow location updates");
 
         participant.setLatitude(latitude);
         participant.setLongitude(longitude);
 
         participantRepository.save(participant);
-
-        return 0;
     }
 }
